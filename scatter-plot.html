@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Aggie Hoops Analytics – Player Efficiency Scatter Plot</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Tailwind config for Aggie colors -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'aggie-blue': '#004b8d',
+            'aggie-gold': '#fdb927',
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+        },
+      },
+    };
+  </script>
+
+  <style>
+      * {
+          box-sizing: border-box;
+      }
+
+      html,
+      body {
+          margin: 0;
+          padding: 0;
+          min-height: 100vh;
+          background: radial-gradient(circle at top, #0f172a 0, #020617 48%, #000 100%);
+          color: #e5e7eb;
+          font-family: system-ui, -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
+      }
+
+      a {
+          color: inherit;
+          text-decoration: none;
+      }
+
+      /* === FULLSCREEN VIDEO BACKGROUND === */
+      .video-bg {
+          position: fixed;
+          inset: 0;
+          z-index: -2;
+          overflow: hidden;
+      }
+
+      .video-bg video {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          filter: brightness(0.25) saturate(1.2);
+      }
+
+      .video-overlay {
+          position: fixed;
+          inset: 0;
+          z-index: -1;
+          pointer-events: none;
+          background: radial-gradient(circle at top, rgba(15,23,42,0.85), rgba(0,0,0,0.95));
+      }
+
+      /* ---------- Top bar / nav ---------- */
+      .top-bar {
+          position: sticky;
+          top: 0;
+          z-index: 20;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 0.7rem 3.5rem;
+          background: linear-gradient(90deg, #0b1120, #020617f2);
+          border-bottom: 1px solid rgba(148, 163, 184, 0.3);
+          backdrop-filter: blur(16px);
+      }
+
+      .logo-lockup {
+          display: flex;
+          align-items: center;
+          gap: 0.6rem;
+      }
+
+      .logo-mark {
+          height: 44px;
+          width: auto;
+          object-fit: contain;
+      }
+
+      .site-title {
+          font-weight: 800;
+          font-size: 1.1rem;
+          letter-spacing: 0.16em;
+          text-transform: uppercase;
+          color: #facc15;
+          text-shadow: 0 0 18px rgba(250, 204, 21, 0.55);
+      }
+
+      .nav-group {
+          display: flex;
+          align-items: center;
+          gap: 0.4rem;
+      }
+
+      .nav-pill {
+          padding: 0.45rem 1.2rem;
+          border-radius: 999px;
+          font-size: 0.8rem;
+          text-transform: uppercase;
+          letter-spacing: 0.12em;
+          font-weight: 600;
+          border: 1px solid rgba(148, 163, 184, 0.55);
+          background: radial-gradient(circle at top left, #1e293b, #020617);
+          color: #e5e7eb;
+          display: inline-flex;
+          align-items: center;
+          gap: 0.35rem;
+          cursor: pointer;
+          transition:
+                  border-color 0.18s ease,
+                  background 0.18s ease,
+                  transform 0.15s ease,
+                  box-shadow 0.18s ease,
+                  color 0.18s ease;
+      }
+
+      .nav-pill:hover {
+          border-color: rgba(250, 204, 21, 0.9);
+          color: #fefce8;
+          transform: translateY(-1px);
+          box-shadow: 0 8px 26px rgba(0, 0, 0, 0.4);
+      }
+
+      .nav-pill.nav-active {
+          background: linear-gradient(135deg, #facc15, #f97316);
+          color: #111827;
+          border-color: transparent;
+          box-shadow: 0 12px 32px rgba(250, 204, 21, 0.45);
+      }
+
+      /* Chart Container */
+      .chart-container {
+          max-width: 1400px;
+          margin: 2rem auto;
+          padding: 0 3.5rem;
+      }
+
+      .chart-card {
+          background: rgba(30, 41, 59, 0.4);
+          border: 1px solid rgba(148, 163, 184, 0.3);
+          border-radius: 16px;
+          padding: 2rem;
+          backdrop-filter: blur(16px);
+          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+      }
+
+      .chart-header {
+          margin-bottom: 1.5rem;
+      }
+
+      .chart-title {
+          font-size: 2rem;
+          font-weight: 800;
+          text-transform: uppercase;
+          letter-spacing: 0.12em;
+          color: #facc15;
+          text-shadow: 0 0 26px rgba(250, 204, 21, 0.5);
+          margin-bottom: 0.5rem;
+      }
+
+      .chart-subtitle {
+          color: #cbd5e1;
+          font-size: 0.95rem;
+      }
+
+      .canvas-wrapper {
+          background: rgba(15, 23, 42, 0.6);
+          border-radius: 12px;
+          padding: 1.5rem;
+          margin-bottom: 1.5rem;
+      }
+
+      canvas {
+          display: block;
+          margin: 0 auto;
+          cursor: crosshair;
+          border-radius: 8px;
+      }
+
+      .legend-section {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+          gap: 1rem;
+          margin-top: 1.5rem;
+      }
+
+      .legend-item {
+          background: rgba(15, 23, 42, 0.5);
+          border: 1px solid rgba(148, 163, 184, 0.2);
+          border-radius: 8px;
+          padding: 1rem;
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+      }
+
+      .legend-dot {
+          width: 16px;
+          height: 16px;
+          border-radius: 50%;
+          flex-shrink: 0;
+      }
+
+      .legend-text {
+          font-size: 0.9rem;
+          color: #e5e7eb;
+      }
+
+      .legend-text strong {
+          color: #facc15;
+      }
+
+      .reference-line-item {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+      }
+
+      .reference-line-indicator {
+          width: 40px;
+          height: 3px;
+          border-radius: 2px;
+      }
+
+      .tooltip {
+          position: absolute;
+          background: rgba(0, 0, 0, 0.95);
+          color: white;
+          padding: 12px 16px;
+          border-radius: 8px;
+          font-size: 13px;
+          pointer-events: none;
+          display: none;
+          white-space: nowrap;
+          z-index: 1000;
+          border: 1px solid #facc15;
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+      }
+
+      .tooltip strong {
+          color: #facc15;
+      }
+
+      @media (max-width: 960px) {
+          .top-bar {
+              padding-inline: 1.5rem;
+          }
+          
+          .chart-container {
+              padding-inline: 1.5rem;
+          }
+
+          .chart-card {
+              padding: 1.5rem;
+          }
+
+          canvas {
+              max-width: 100%;
+              height: auto;
+          }
+      }
+  </style>
+</head>
+<body>
+
+<!-- Video Background -->
+<div class="video-bg">
+  <video autoplay muted loop playsinline>
+    <source src="https://assets.mixkit.co/videos/preview/mixkit-basketball-player-shooting-hoops-in-slow-motion-9741-large.mp4" type="video/mp4" />
+  </video>
+</div>
+<div class="video-overlay"></div>
+
+<!-- Top Navigation -->
+<div class="top-bar">
+
+  <div class="logo-lockup">
+    <img
+      src="https://raw.githubusercontent.com/AJThomasNCAT/webimages/main/NC_A%26T_Logo_Icon_2C.png"
+      alt="NC A&T Logo"
+      class="logo-mark"
+    />
+    <span class="site-title">Aggie Hoops Analytics</span>
+  </div>
+  </div>
+
+  
+
+  <nav class="flex gap-3 text-xs font-bold">
+    <a href="welcome.html" class="nav-pill">Welcome</a>
+    <a href="home.html" class="nav-pill">Aggie Analytics</a>
+    <a href="strategy-lab.html" class="nav-pill">Strategy Lab</a>
+    <a href="scatter-plot.html" class="nav-pill nav-active">Team Scatter plots</a>
+  </nav>
+</div>
+
+<!-- Main Content -->
+<div class="chart-container">
+  <div class="chart-card">
+    <div class="chart-header">
+      <h1 class="chart-title"> Men's Player Efficiency Scatter Plot</h1>
+      <p class="chart-subtitle">Minutes Per Game vs True Shooting Percentage — Identifying high-value contributors</p>
+    </div>
+
+    <div class="canvas-wrapper">
+      <canvas id="scatterPlot" width="1200" height="700"></canvas>
+    </div>
+
+    <div class="legend-section">
+      <div class="legend-item">
+        <div class="legend-dot" style="background: #22c55e;"></div>
+        <div class="legend-text"><strong>High Efficiency, High Minutes</strong> — Elite performers</div>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background: #fbbf24;"></div>
+        <div class="legend-text"><strong>High Efficiency, Low Minutes</strong> — Underutilized talent</div>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background: #fb923c;"></div>
+        <div class="legend-text"><strong>Low Efficiency, High Minutes</strong> — Needs improvement</div>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background: #ef4444;"></div>
+        <div class="legend-text"><strong>Low Efficiency, Low Minutes</strong> — Limited impact</div>
+      </div>
+    </div>
+
+    <div class="legend-section" style="margin-top: 1rem;">
+      <div class="legend-item">
+        <div class="reference-line-item">
+          <div class="reference-line-indicator" style="background: #ef4444; opacity: 0.6;"></div>
+          <div class="legend-text"><strong>TS% = 49%</strong> — Shooting efficiency baseline</div>
+        </div>
+      </div>
+      <div class="legend-item">
+        <div class="reference-line-item">
+          <div class="reference-line-indicator" style="background: #22c55e; opacity: 0.6;"></div>
+          <div class="legend-text"><strong>Minutes = 17.1</strong> — Playing time baseline</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Second Chart -->
+ <div class="chart-container">
+  <div class="chart-card" style="margin-top: 2rem;">
+    <div class="chart-header">
+      <h1 class="chart-title">Women's Player Efficiency Scatter Plot</h1>
+      <p class="chart-subtitle">Points Per Game vs Assists Per Game — Identifying playmaking scorers</p>
+    </div>
+
+    <div class="canvas-wrapper">
+      <canvas id="scatterPlot2" width="1200" height="700"></canvas>
+    </div>
+
+    <div class="legend-section">
+      <div class="legend-item">
+        <div class="legend-dot" style="background: #22c55e;"></div>
+        <div class="legend-text"><strong>High Scoring, High Assists</strong> — Elite playmakers</div>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background: #fbbf24;"></div>
+        <div class="legend-text"><strong>Low Scoring, High Assists</strong> — Pure facilitators</div>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background: #fb923c;"></div>
+        <div class="legend-text"><strong>High Scoring, Low Assists</strong> — Volume scorers</div>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background: #ef4444;"></div>
+        <div class="legend-text"><strong>Low Scoring, Low Assists</strong> — Limited offensive impact</div>
+      </div>
+    </div>
+
+    <div class="legend-section" style="margin-top: 1rem;">
+      <div class="legend-item">
+        <div class="reference-line-item">
+          <div class="reference-line-indicator" style="background: #ef4444; opacity: 0.6;"></div>
+          <div class="legend-text"><strong>Assists = 2.5</strong> — Playmaking baseline</div>
+        </div>
+      </div>
+      <div class="legend-item">
+        <div class="reference-line-item">
+          <div class="reference-line-indicator" style="background: #22c55e; opacity: 0.6;"></div>
+          <div class="legend-text"><strong>Points = 10</strong> — Scoring baseline</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+<div class="tooltip" id="tooltip2"></div>
+
+<script>
+  const canvas = document.getElementById('scatterPlot');
+  const ctx = canvas.getContext('2d');
+  const tooltip = document.getElementById('tooltip');
+
+  // Dataset
+  const data = [
+    {x: 32, y: 0.65, name: "Walker, Lureon"},
+    {x: 26, y: 0.68, name: "Walker, Lewis"},
+    {x: 24.3, y: 0.5, name: "Weluche-Ume, Zamoku"},
+    {x: 22, y: 0.43, name: "Middleton, Jr., Trent"},
+    {x: 15.3, y: 0.65, name: "Debrick, KJ"},
+    {x: 28, y: 0.37, name: "Ogletree, Bryson"},
+    {x: 15.5, y: 0.48, name: "Pierce, Dwayne"},
+    {x: 14.3, y: 0.41, name: "Doumbia, Amadou"},
+    {x: 11, y: 0.4, name: "Burton, Mujahiid"},
+    {x: 18.7, y: 0.24, name: "Vick, Brooklyn"},
+    {x: 8.5, y: 0.69, name: "Cueto, Yancarlos"},
+    {x: 5, y: 1, name: "Felton, Will"}
+  ];
+
+  // Reference lines
+  const refY = 0.49;
+  const refX = 17.1;
+
+  // Chart dimensions
+  const padding = 80;
+  const chartWidth = canvas.width - padding * 2;
+  const chartHeight = canvas.height - padding * 2;
+
+  // Find min/max values
+  const xValues = data.map(d => d.x);
+  const yValues = data.map(d => d.y);
+  const minX = 0;
+  const maxX = Math.ceil(Math.max(...xValues) / 5) * 5;
+  const minY = 0;
+  const maxY = 1.0;
+
+  // Scale functions
+  function scaleX(x) {
+    return padding + (x - minX) / (maxX - minX) * chartWidth;
+  }
+
+  function scaleY(y) {
+    return canvas.height - padding - (y - minY) / (maxY - minY) * chartHeight;
+  }
+
+  // Draw grid
+  function drawGrid() {
+    ctx.strokeStyle = 'rgba(148, 163, 184, 0.15)';
+    ctx.lineWidth = 1;
+
+    // Vertical grid lines
+    for (let i = 0; i <= 10; i++) {
+      const x = padding + (chartWidth / 10) * i;
+      ctx.beginPath();
+      ctx.moveTo(x, padding);
+      ctx.lineTo(x, canvas.height - padding);
+      ctx.stroke();
+    }
+
+    // Horizontal grid lines
+    for (let i = 0; i <= 10; i++) {
+      const y = padding + (chartHeight / 10) * i;
+      ctx.beginPath();
+      ctx.moveTo(padding, y);
+      ctx.lineTo(canvas.width - padding, y);
+      ctx.stroke();
+    }
+  }
+
+  // Draw axes
+  function drawAxes() {
+    ctx.strokeStyle = '#cbd5e1';
+    ctx.lineWidth = 2;
+
+    // X-axis
+    ctx.beginPath();
+    ctx.moveTo(padding, canvas.height - padding);
+    ctx.lineTo(canvas.width - padding, canvas.height - padding);
+    ctx.stroke();
+
+    // Y-axis
+    ctx.beginPath();
+    ctx.moveTo(padding, padding);
+    ctx.lineTo(padding, canvas.height - padding);
+    ctx.stroke();
+
+    // X-axis labels
+    ctx.fillStyle = '#e5e7eb';
+    ctx.font = '13px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    for (let i = 0; i <= 10; i++) {
+      const x = padding + (chartWidth / 10) * i;
+      const value = (maxX / 10 * i).toFixed(0);
+      ctx.fillText(value, x, canvas.height - padding + 25);
+    }
+
+    // Y-axis labels
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    for (let i = 0; i <= 10; i++) {
+      const y = canvas.height - padding - (chartHeight / 10) * i;
+      const value = ((maxY / 10 * i) * 100).toFixed(0) + '%';
+      ctx.fillText(value, padding - 15, y);
+    }
+
+    // Axis titles
+    ctx.fillStyle = '#facc15';
+    ctx.font = 'bold 16px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText('Minutes Per Game', canvas.width / 2, canvas.height - 35);
+
+    ctx.save();
+    ctx.translate(14, canvas.height / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.textAlign = 'center';
+    ctx.fillText('True Shooting Percentage', 0, 0);
+    ctx.restore();
+  }
+
+  // Draw reference lines
+  function drawReferenceLines() {
+    // Y reference line (True Shooting % = 0.49)
+    ctx.strokeStyle = '#ef4444';
+    ctx.lineWidth = 3;
+    ctx.setLineDash([10, 6]);
+    ctx.globalAlpha = 0.6;
+    ctx.beginPath();
+    const yPos = scaleY(refY);
+    ctx.moveTo(padding, yPos);
+    ctx.lineTo(canvas.width - padding, yPos);
+    ctx.stroke();
+
+    // X reference line (Minutes = 17.1)
+    ctx.strokeStyle = '#22c55e';
+    ctx.beginPath();
+    const xPos = scaleX(refX);
+    ctx.moveTo(xPos, padding);
+    ctx.lineTo(xPos, canvas.height - padding);
+    ctx.stroke();
+
+    ctx.globalAlpha = 1.0;
+    ctx.setLineDash([]);
+  }
+
+  // Draw data points
+  function drawPoints() {
+    data.forEach((point, index) => {
+      const x = scaleX(point.x);
+      const y = scaleY(point.y);
+
+      // Determine color based on quadrant
+      let color = '#667eea';
+      if (point.x >= refX && point.y >= refY) {
+        color = '#22c55e'; // Green - high minutes, high efficiency
+      } else if (point.x < refX && point.y >= refY) {
+        color = '#fbbf24'; // Yellow - low minutes, high efficiency
+      } else if (point.x >= refX && point.y < refY) {
+        color = '#fb923c'; // Orange - high minutes, low efficiency
+      } else {
+        color = '#ef4444'; // Red - low minutes, low efficiency
+      }
+
+      // Draw glow effect
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = color;
+
+      // Draw point
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(x, y, 10, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Draw border
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+    });
+  }
+
+  // Draw chart
+  function drawChart() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawGrid();
+    drawReferenceLines();
+    drawAxes();
+    drawPoints();
+  }
+
+  // Mouse hover effect
+  canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    let hoveredPoint = null;
+    data.forEach((point, index) => {
+      const x = scaleX(point.x);
+      const y = scaleY(point.y);
+      const distance = Math.sqrt((mouseX - x) ** 2 + (mouseY - y) ** 2);
+
+      if (distance < 12) {
+        hoveredPoint = {point, index, x, y};
+      }
+    });
+
+    if (hoveredPoint) {
+      tooltip.style.display = 'block';
+      tooltip.style.left = (e.clientX + 15) + 'px';
+      tooltip.style.top = (e.clientY - 10) + 'px';
+      tooltip.innerHTML = `
+        <strong>${hoveredPoint.point.name}</strong><br>
+        Minutes: ${hoveredPoint.point.x}<br>
+        TS%: ${(hoveredPoint.point.y * 100).toFixed(1)}%
+      `;
+      canvas.style.cursor = 'pointer';
+    } else {
+      tooltip.style.display = 'none';
+      canvas.style.cursor = 'crosshair';
+    }
+  });
+
+  canvas.addEventListener('mouseleave', () => {
+    tooltip.style.display = 'none';
+  });
+
+  // Initial draw
+  drawChart();
+
+  // ============================================
+  // SECOND CHART - Points vs Assists
+  // ============================================
+  const canvas2 = document.getElementById('scatterPlot2');
+  const ctx2 = canvas2.getContext('2d');
+  const tooltip2 = document.getElementById('tooltip2');
+
+  // Dataset 2 - Points Per Game (x) vs Assists Per Game (y)
+  const data2 = [
+    {x: 18.5, y: 5.2, name: 'Marcus Johnson'},
+    {x: 14.2, y: 6.1, name: 'DeAndre Williams'},
+    {x: 12.8, y: 2.1, name: 'Tyrell Jackson'},
+    {x: 9.5, y: 1.8, name: 'Jamal Thompson'},
+    {x: 7.3, y: 4.5, name: 'Chris Davis'},
+    {x: 15.6, y: 1.5, name: 'Kevin Brown'},
+    {x: 6.8, y: 3.2, name: 'Andre Miller'},
+    {x: 5.2, y: 2.8, name: 'Darius Moore'},
+    {x: 4.1, y: 1.2, name: 'Brandon Lee'},
+    {x: 8.9, y: 0.9, name: 'Terrance Wilson'},
+    {x: 3.5, y: 3.8, name: 'Isaiah Carter'},
+    {x: 2.1, y: 1.5, name: 'Jordan Harris'}
+  ];
+
+  // Reference lines for chart 2
+  const refY2 = 2.5; // Assists baseline
+  const refX2 = 10;  // Points baseline
+
+  // Find min/max values for chart 2
+  const xValues2 = data2.map(d => d.x);
+  const yValues2 = data2.map(d => d.y);
+  const minX2 = 0;
+  const maxX2 = Math.ceil(Math.max(...xValues2) / 5) * 5;
+  const minY2 = 0;
+  const maxY2 = Math.ceil(Math.max(...yValues2));
+
+  // Scale functions for chart 2
+  function scaleX2(x) {
+    return padding + (x - minX2) / (maxX2 - minX2) * chartWidth;
+  }
+
+  function scaleY2(y) {
+    return canvas2.height - padding - (y - minY2) / (maxY2 - minY2) * chartHeight;
+  }
+
+  // Draw grid for chart 2
+  function drawGrid2() {
+    ctx2.strokeStyle = 'rgba(148, 163, 184, 0.15)';
+    ctx2.lineWidth = 1;
+
+    for (let i = 0; i <= 10; i++) {
+      const x = padding + (chartWidth / 10) * i;
+      ctx2.beginPath();
+      ctx2.moveTo(x, padding);
+      ctx2.lineTo(x, canvas2.height - padding);
+      ctx2.stroke();
+    }
+
+    for (let i = 0; i <= 10; i++) {
+      const y = padding + (chartHeight / 10) * i;
+      ctx2.beginPath();
+      ctx2.moveTo(padding, y);
+      ctx2.lineTo(canvas2.width - padding, y);
+      ctx2.stroke();
+    }
+  }
+
+  // Draw axes for chart 2
+  function drawAxes2() {
+    ctx2.strokeStyle = '#cbd5e1';
+    ctx2.lineWidth = 2;
+
+    ctx2.beginPath();
+    ctx2.moveTo(padding, canvas2.height - padding);
+    ctx2.lineTo(canvas2.width - padding, canvas2.height - padding);
+    ctx2.stroke();
+
+    ctx2.beginPath();
+    ctx2.moveTo(padding, padding);
+    ctx2.lineTo(padding, canvas2.height - padding);
+    ctx2.stroke();
+
+    // X-axis labels
+    ctx2.fillStyle = '#e5e7eb';
+    ctx2.font = '13px Inter, sans-serif';
+    ctx2.textAlign = 'center';
+    for (let i = 0; i <= 10; i++) {
+      const x = padding + (chartWidth / 10) * i;
+      const value = (maxX2 / 10 * i).toFixed(0);
+      ctx2.fillText(value, x, canvas2.height - padding + 25);
+    }
+
+    // Y-axis labels
+    ctx2.textAlign = 'right';
+    ctx2.textBaseline = 'middle';
+    for (let i = 0; i <= 10; i++) {
+      const y = canvas2.height - padding - (chartHeight / 10) * i;
+      const value = (maxY2 / 10 * i).toFixed(1);
+      ctx2.fillText(value, padding - 15, y);
+    }
+
+    // Axis titles
+    ctx2.fillStyle = '#facc15';
+    ctx2.font = 'bold 16px Inter, sans-serif';
+    ctx2.textAlign = 'center';
+    ctx2.textBaseline = 'top';
+    ctx2.fillText('Points Per Game', canvas2.width / 2, canvas2.height - 35);
+
+    ctx2.save();
+    ctx2.translate(25, canvas2.height / 2);
+    ctx2.rotate(-Math.PI / 2);
+    ctx2.textAlign = 'center';
+    ctx2.fillText('Assists Per Game', 0, 0);
+    ctx2.restore();
+  }
+
+  // Draw reference lines for chart 2
+  function drawReferenceLines2() {
+    // Y reference line (Assists = 2.5)
+    ctx2.strokeStyle = '#ef4444';
+    ctx2.lineWidth = 3;
+    ctx2.setLineDash([10, 6]);
+    ctx2.globalAlpha = 0.6;
+    ctx2.beginPath();
+    const yPos = scaleY2(refY2);
+    ctx2.moveTo(padding, yPos);
+    ctx2.lineTo(canvas2.width - padding, yPos);
+    ctx2.stroke();
+
+    // X reference line (Points = 10)
+    ctx2.strokeStyle = '#22c55e';
+    ctx2.beginPath();
+    const xPos = scaleX2(refX2);
+    ctx2.moveTo(xPos, padding);
+    ctx2.lineTo(xPos, canvas2.height - padding);
+    ctx2.stroke();
+
+    ctx2.globalAlpha = 1.0;
+    ctx2.setLineDash([]);
+  }
+
+  // Draw data points for chart 2
+  function drawPoints2() {
+    data2.forEach((point, index) => {
+      const x = scaleX2(point.x);
+      const y = scaleY2(point.y);
+
+      // Determine color based on quadrant
+      let color = '#667eea';
+      if (point.x >= refX2 && point.y >= refY2) {
+        color = '#22c55e'; // Green - high points, high assists
+      } else if (point.x < refX2 && point.y >= refY2) {
+        color = '#fbbf24'; // Yellow - low points, high assists
+      } else if (point.x >= refX2 && point.y < refY2) {
+        color = '#fb923c'; // Orange - high points, low assists
+      } else {
+        color = '#ef4444'; // Red - low points, low assists
+      }
+
+      // Draw glow effect
+      ctx2.shadowBlur = 15;
+      ctx2.shadowColor = color;
+
+      // Draw point
+      ctx2.fillStyle = color;
+      ctx2.beginPath();
+      ctx2.arc(x, y, 10, 0, Math.PI * 2);
+      ctx2.fill();
+
+      // Draw border
+      ctx2.shadowBlur = 0;
+      ctx2.strokeStyle = '#fff';
+      ctx2.lineWidth = 2.5;
+      ctx2.stroke();
+    });
+  }
+
+  // Draw chart 2
+  function drawChart2() {
+    ctx2.clearRect(0, 0, canvas2.width, canvas2.height);
+    drawGrid2();
+    drawReferenceLines2();
+    drawAxes2();
+    drawPoints2();
+  }
+
+  // Mouse hover effect for chart 2
+  canvas2.addEventListener('mousemove', (e) => {
+    const rect = canvas2.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    let hoveredPoint = null;
+    data2.forEach((point, index) => {
+      const x = scaleX2(point.x);
+      const y = scaleY2(point.y);
+      const distance = Math.sqrt((mouseX - x) ** 2 + (mouseY - y) ** 2);
+
+      if (distance < 12) {
+        hoveredPoint = {point, index, x, y};
+      }
+    });
+
+    if (hoveredPoint) {
+      tooltip2.style.display = 'block';
+      tooltip2.style.left = (e.clientX + 15) + 'px';
+      tooltip2.style.top = (e.clientY - 10) + 'px';
+      tooltip2.innerHTML = `
+        <strong>${hoveredPoint.point.name}</strong><br>
+        Points: ${hoveredPoint.point.x}<br>
+        Assists: ${hoveredPoint.point.y}
+      `;
+      canvas2.style.cursor = 'pointer';
+    } else {
+      tooltip2.style.display = 'none';
+      canvas2.style.cursor = 'crosshair';
+    }
+  });
+
+  canvas2.addEventListener('mouseleave', () => {
+    tooltip2.style.display = 'none';
+  });
+
+  // Initial draw for chart 2
+  drawChart2();
+</script>
+
+</body>
+</html>
